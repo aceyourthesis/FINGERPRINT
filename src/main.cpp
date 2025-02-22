@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include <Adafruit_Fingerprint.h>
+#include <WiFi.h>
 
 // Use Hardware Serial on ESP32
 HardwareSerial mySerial(2); // Use UART2 (RX2, TX2)
@@ -8,12 +9,18 @@ HardwareSerial mySerial(2); // Use UART2 (RX2, TX2)
 // Connect sensor's RX to ESP32 TX2 (GPIO17)
 // Connect sensor's TX to ESP32 RX2 (GPIO16)
 
-bool isIdMode = true; // true for identification false for enrollment
+// Replace with your WiFi credentials
+const char* ssid = "qwertyuiop";     // Change to your WiFi network name  SmartBro_EEAA7
+const char* password = "12345678"; // Change to your WiFi password  smartbro
+
+
+bool isIdMode = false; // true for identification false for enrollment
 bool isEnrolled = false;
 bool modePrinted = false;
 bool gotId = false;
 int idToSave = 0;
 byte readAttempt = 20;
+bool isConnectedToWifi = false;
 
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
@@ -267,10 +274,40 @@ byte getFingerId(int _attempt) {
   return 0; // Return 0 if no valid fingerprint found
 }
 
+void setupWiFi() {
+  Serial.print("Connecting to WiFi...");
+  
+  WiFi.begin(ssid, password); // Start connecting to WiFi
+  
+  while (WiFi.status() != WL_CONNECTED) { 
+      delay(500);
+      Serial.print(".");
+  }
+  isConnectedToWifi = true;
+  Serial.println("\nWiFi connected!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP()); // Print the assigned IP address
+}
+
+void checkWifi(){
+  if (WiFi.status() == WL_CONNECTED) {
+    if(!isConnectedToWifi){
+      Serial.printf("\n\n----------------\n\nWiFi Connected\n\n----------------\n");
+    }
+    isConnectedToWifi = true;
+  } else{
+    if(isConnectedToWifi) {
+      Serial.printf("\n\n----------------\n\nWiFi Detatched\n\n----------------\n");
+    }
+    isConnectedToWifi = false;
+  }
+}
+
 
 void setup() {
     Serial.begin(115200);
     while (!Serial);  // Ensure serial is ready
+    setupWiFi();           // Call WiFi setup function
     delay(100);
     setupFingerprintSensor();
     Serial.println("\n\nAdafruit Fingerprint Sensor Enrollment");
@@ -278,6 +315,7 @@ void setup() {
 
 
 void loop() {
+  checkWifi(); //checks wifi status and prints it 
   getMode();
   if (!modePrinted){
     Serial.printf("Mode: %s\n", isIdMode ? "Identify" : "Enroll");
@@ -287,7 +325,7 @@ void loop() {
   if (!isIdMode){
     enroll();
   } else {
-    if(!gotId){
+    if(!gotId){        
       getFingerId(readAttempt);
     }
   }
