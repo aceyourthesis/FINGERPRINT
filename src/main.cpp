@@ -11,15 +11,18 @@ HardwareSerial mySerial(2); // Use UART2 (RX2, TX2)
 bool isIdMode = true; // true for identification false for enrollment
 bool isEnrolled = false;
 bool modePrinted = false;
+bool gotId = false;
+int idToSave = 0;
+byte readAttempt = 20;
 
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 uint8_t id;
 
-uint8_t enrollFingerprint() {
+uint8_t enrollFingerprint(int _idToEnroll) {
     int p = -1;
     Serial.print("Waiting for valid finger to enroll as #");
-    Serial.println(id);
+    Serial.println(_idToEnroll);
 
     while (p != FINGERPRINT_OK) {
         p = finger.getImage();
@@ -71,7 +74,7 @@ uint8_t enrollFingerprint() {
         p = finger.getImage();
     }
 
-    Serial.print("ID "); Serial.println(id);
+    Serial.print("ID "); Serial.println(_idToEnroll);
     p = -1;
     Serial.println("Place the same finger again");
     while (p != FINGERPRINT_OK) {
@@ -118,7 +121,7 @@ uint8_t enrollFingerprint() {
     }
 
     Serial.print("Creating model for #");
-    Serial.println(id);
+    Serial.println(_idToEnroll);
     p = finger.createModel();
     if (p == FINGERPRINT_OK) {
         Serial.println("Prints matched!");
@@ -134,8 +137,8 @@ uint8_t enrollFingerprint() {
     }
 
     Serial.print("Storing ID ");
-    Serial.println(id);
-    p = finger.storeModel(id);
+    Serial.println(_idToEnroll);
+    p = finger.storeModel(_idToEnroll);
     if (p == FINGERPRINT_OK) {
         Serial.println("Stored!");
     } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
@@ -235,17 +238,35 @@ void getMode (){
 
 void enroll(){
   if (!isEnrolled){
-    enrollFingerprint();
+    Serial.println("Give me a number:");
+
+    while (Serial.available() == 0) {
+      // Wait for user input
+    }
+    
+    int _IDnum = Serial.parseInt(); // Read the number as an integer
+
+    Serial.print("Enrolling ID: ");
+    Serial.println(_IDnum);
+
+    enrollFingerprint(_IDnum);  // Pass the ID number to the function
     isEnrolled = true;
   }
 }
 
+byte getFingerId(int _attempt) {
+  int id;
 
-
-// Function to get fingerprint id
-byte getFingerId(){
- return getFingerprintID();
+  for (int i = 0; i < _attempt; i++) { // Fix condition here
+    Serial.printf("ID attempt: %d\n", i);
+    id = getFingerprintID();
+    if (id != 0) {
+      return id; // Return valid ID immediately
+    }
+  }
+  return 0; // Return 0 if no valid fingerprint found
 }
+
 
 void setup() {
     Serial.begin(115200);
@@ -266,6 +287,8 @@ void loop() {
   if (!isIdMode){
     enroll();
   } else {
-    getFingerId();
+    if(!gotId){
+      getFingerId(readAttempt);
+    }
   }
 }
